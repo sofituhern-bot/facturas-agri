@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facturas Agri</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #1D9E75; --green-dark: #0F6E56; --green-light: #E1F5EE; --green-mid: #5DCAA5;
+    --bg: #F7F6F2; --surface: #FFFFFF; --surface2: #F2F1ED;
+    --text: #1A1A18; --text2: #6B6A65; --text3: #9B9A96;
+    --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.13);
+    --red: #C94040; --red-bg: #FEF0F0;
+    --blue: #1B6DB5; --blue-bg: #EDF4FB;
+    --purple: #5B44C4; --purple-bg: #F0EEFB;
+    --radius: 10px; --radius-lg: 16px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-logo {
+    width: 32px; height: 32px;
+    background: var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .topbar-logo svg { width: 18px; height: 18px; fill: white; }
+  .topbar-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-sub { font-size: 13px; color: var(--text2); margin-left: 2px; }
+  .topbar-spacer { flex: 1; }
+  .topbar-badge {
+    background: var(--green-light);
+    color: var(--green-dark);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 1.5rem;
+    width: fit-content;
+  }
+  .tab {
+    padding: 8px 20px; font-size: 14px; font-weight: 500;
+    border: none; background: transparent; cursor: pointer;
+    border-radius: 7px; color: var(--text2);
+    transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+  }
+  .tab.active { background: var(--green); color: white; }
+  .tab:not(.active):hover { background: var(--surface2); color: var(--text); }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.25rem;
+  }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
+  .card-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--green);
+    background: var(--green-light);
+  }
+  .drop-zone-icon {
+    width: 48px; height: 48px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+  }
+  .drop-zone-icon svg { width: 22px; height: 22px; fill: var(--green); }
+  .drop-zone p { font-size: 14px; color: var(--text2); line-height: 1.5; }
+  .drop-zone strong { color: var(--text); font-weight: 600; }
+  .drop-zone input { display: none; }
+
+  .file-preview {
+    display: none; align-items: center; gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-top: 1rem;
+  }
+  .file-preview.visible { display: flex; }
+  .file-icon-box {
+    width: 36px; height: 36px;
+    background: var(--red-bg);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .file-icon-box svg { width: 18px; height: 18px; fill: var(--red); }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 12px; color: var(--text2); }
+  
+  .status {
+    display: none; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: var(--radius);
+    font-size: 13px; margin-top: 1rem;
+  }
+  .status.show { display: flex; }
+  .status.processing { background: var(--blue-bg); color: var(--blue); border: 1px solid #AECDEF; }
+  .status.success { background: var(--green-light); color: var(--green-dark); border: 1px solid var(--green-mid); }
+  .status.error { background: var(--red-bg); color: var(--red); border: 1px solid #F5BBBB; }
+  .spinner {
+    width: 14px; height: 14px; flex-shrink: 0;
+    border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* API KEY BANNER */
+  .api-banner {
+    background: #FFF8E1;
+    border: 1px solid #FFD54F;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    color: #5D4037;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .api-banner a { color: var(--green-dark); font-weight: 600; }
+  .api-key-row { display: flex; gap: 8px; margin-top: 10px; }
+  .api-key-row input { flex: 1; font-family: 'DM Mono', monospace; font-size: 12px; }
+  .api-key-row button { white-space: nowrap; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 1.5rem; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+  input, select {
+    width: 100%; padding: 9px 12px;
+    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+  input[readonly] { background: var(--surface2); cursor: default; color: var(--text2); }
+  input::placeholder { color: var(--text3); }
+
+  .btn {
+    padding: 9px 20px; font-size: 14px; font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    border-radius: var(--radius); cursor: pointer;
+    transition: all 0.15s; border: none;
+  }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-primary:disabled { background: var(--green-mid); cursor: not-allowed; opacity: 0.7; }
+  .btn-ghost {
+    background: transparent; color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-excel {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-excel:hover { background: var(--surface2); }
+  .btn-excel svg { width: 14px; height: 14px; fill: #217346; }
+  .actions { display: flex; gap: 10px; margin-top: 1.5rem; }
+
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .metric-label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .metric-value { font-size: 24px; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
+  .metric-value.green { color: var(--green-dark); }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+  .toolbar input { flex: 1; }
+  .count { font-size: 12px; color: var(--text2); white-space: nowrap; }
+
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .tbl th {
+    font-size: 11px; font-weight: 600; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 11px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tbl td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text); vertical-align: middle;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tbody tr:hover td { background: var(--surface2); }
+  .tbl .col-fecha { width: 100px; }
+  .tbl .col-proveedor { width: 180px; }
+  .tbl .col-tipo { width: 105px; }
+  .tbl .col-comp { width: 130px; font-family: 'DM Mono', monospace; font-size: 12px; }
+  .tbl .col-monto { width: 110px; text-align: right; font-family: 'DM Mono', monospace; }
+  .tbl .col-carga { width: 100px; }
+  .tbl .col-del { width: 44px; text-align: center; }
+  .monto-cell { text-align: right; }
+
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .b-a { background: var(--green-light); color: var(--green-dark); }
+  .b-b { background: var(--blue-bg); color: var(--blue); }
+  .b-c { background: var(--purple-bg); color: var(--purple); }
+  .b-x { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+
+  .del-btn {
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text3); transition: all 0.15s;
+    font-size: 14px; line-height: 1;
+  }
+  .del-btn:hover { background: var(--red-bg); color: var(--red); border-color: #F5BBBB; }
+
+  .empty {
+    text-align: center; padding: 3.5rem 1rem;
+    color: var(--text2); font-size: 14px;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; display: block; opacity: 0.4; }
+
+  @media (max-width: 600px) {
+    .main { padding: 1rem; }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full { grid-column: 1; }
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .metrics .metric-card:last-child { grid-column: 1 / -1; }
+    .topbar-sub { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8zm0-4h5v2H8z"/></svg>
+  </div>
+  <div class="topbar-title">Facturas Agri</div>
+  <div class="topbar-sub">Sistema de comprobantes</div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-badge" id="topBadge">0 facturas</div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('carga')">📤 Cargar factura</button>
+    <button class="tab" onclick="switchTab('historial')">📋 Historial</button>
+  </div>
+
+  <!-- CARGA -->
+  <div id="sec-carga" class="section active">
+
+    <!-- API KEY BANNER -->
+    <div class="api-banner" id="apiBanner">
+      ⚠️ <div>
+        <strong>Configurá tu API Key de Claude</strong> para que la IA lea las facturas automáticamente.<br>
+        Obtené una gratis en <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> (requiere cuenta).
+        <div class="api-key-row">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off">
+          <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Guardar</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearApiKey()">Quitar</button>
+        </div>
+        <div id="apiKeyStatus" style="font-size:12px;margin-top:6px;color:var(--green-dark);display:none">✓ API Key guardada en este navegador</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Subir archivo</div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFile(this.files[0])">
+        <div class="drop-zone-icon">
+          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+        </div>
+        <p><strong>Arrastrá la factura acá</strong> o hacé clic para seleccionar</p>
+        <p style="margin-top:5px;font-size:12px;color:var(--text3);">PDF, JPG o PNG — la IA lee los datos automáticamente</p>
+      </div>
+
+      <div class="file-preview" id="filePreview">
+        <div class="file-icon-box">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+        </div>
+        <div class="file-info">
+          <div class="file-name" id="prevName">—</div>
+          <div class="file-size" id="prevSize">—</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="clearFile()">Quitar</button>
+      </div>
+
+      <div class="status" id="statusBar">
+        <div class="spinner" id="statusSpinner" style="display:none"></div>
+        <span id="statusText"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Datos de la factura</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Fecha de la factura</label>
+          <input type="date" id="f-fecha">
+        </div>
+        <div class="form-group">
+          <label>Fecha de carga</label>
+          <input type="date" id="f-carga" readonly>
+        </div>
+        <div class="form-group full">
+          <label>Proveedor</label>
+          <input type="text" id="f-proveedor" placeholder="Nombre del proveedor o empresa emisora">
+        </div>
+        <div class="form-group">
+          <label>Tipo de comprobante</label>
+          <select id="f-tipo">
+            <option value="">Seleccionar...</option>
+            <option>Factura A</option>
+            <option>Factura B</option>
+            <option>Factura C</option>
+            <option>Factura M</option>
+            <option>Nota de crédito</option>
+            <option>Nota de débito</option>
+            <option>Recibo</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nro. de comprobante</label>
+          <input type="text" id="f-comprobante" placeholder="Ej: 0001-00012345">
+        </div>
+        <div class="form-group full">
+          <label>Monto total ($)</label>
+          <input type="number" id="f-monto" placeholder="0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btnGuardar" onclick="guardarFactura()">Guardar factura</button>
+        <button class="btn btn-ghost" onclick="limpiarForm()">Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="sec-historial" class="section">
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-label">Total facturas</div>
+        <div class="metric-value" id="m-total">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Monto acumulado</div>
+        <div class="metric-value green" id="m-monto">$0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Este mes</div>
+        <div class="metric-value" id="m-mes">0</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Buscar por proveedor, tipo o comprobante..." oninput="renderTable()">
+      <span class="count" id="countBadge"></span>
+      <button class="btn btn-excel btn-sm" onclick="exportarExcel()">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8zm0-4h5v2H8z"/></svg>
+        Exportar Excel
+      </button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-fecha">Fecha fac.</th>
+            <th class="col-proveedor">Proveedor</th>
+            <th class="col-tipo">Tipo</th>
+            <th class="col-comp">Comprobante</th>
+            <th class="col-monto">Monto</th>
+            <th class="col-carga">Cargado</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'agri_facturas_v2';
+const API_KEY_STORAGE = 'agri_anthropic_key';
+let facturas = [];
+
+function loadData() {
+  try { const r = localStorage.getItem(STORAGE_KEY); if (r) facturas = JSON.parse(r); } catch(e) {}
+}
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(facturas)); } catch(e) {}
+}
+function getApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE) || '';
+}
+function saveApiKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) { alert('Ingresá una API key válida.'); return; }
+  localStorage.setItem(API_KEY_STORAGE, val);
+  document.getElementById('apiKeyStatus').style.display = 'block';
+  document.getElementById('apiKeyInput').value = '';
+}
+function clearApiKey() {
+  localStorage.removeItem(API_KEY_STORAGE);
+  document.getElementById('apiKeyStatus').style.display = 'none';
+}
+
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+
+loadData();
+document.getElementById('f-carga').value = todayISO();
+if (getApiKey()) {
+  document.getElementById('apiKeyStatus').style.display = 'block';
+}
+updateTopBadge();
+
+function updateTopBadge() {
+  document.getElementById('topBadge').textContent = facturas.length + (facturas.length === 1 ? ' factura' : ' facturas');
+}
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((el,i) => el.classList.toggle('active', (t==='carga'&&i===0)||(t==='historial'&&i===1)));
+  document.getElementById('sec-carga').classList.toggle('active', t==='carga');
+  document.getElementById('sec-historial').classList.toggle('active', t==='historial');
+  if (t === 'historial') { renderTable(); updateMetrics(); }
+}
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if(f) handleFile(f); });
+
+let currentB64 = null, currentMime = null, currentFName = null;
+
+function handleFile(file) {
+  if (!file) return;
+  currentFName = file.name;
+  document.getElementById('prevName').textContent = file.name;
+  document.getElementById('prevSize').textContent = (file.size/1024).toFixed(1) + ' KB';
+  document.getElementById('filePreview').classList.add('visible');
+  const reader = new FileReader();
+  reader.onload = e => {
+    const parts = e.target.result.split(',');
+    currentB64 = parts[1];
+    currentMime = file.type;
+    extractData();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearFile() {
+  currentB64 = null; currentMime = null; currentFName = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('filePreview').classList.remove('visible');
+  setStatus('','');
+}
+
+function setStatus(type, msg) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status' + (type ? ' show ' + type : '');
+  document.getElementById('statusText').textContent = msg;
+  document.getElementById('statusSpinner').style.display = type === 'processing' ? 'block' : 'none';
+}
+
+async function extractData() {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    setStatus('error', 'Configurá tu API Key de Claude arriba para usar la lectura automática. Podés completar el formulario a mano.');
+    return;
+  }
+  setStatus('processing', 'Leyendo datos de la factura con IA...');
+  document.getElementById('btnGuardar').disabled = true;
+  try {
+    const isPdf = currentMime === 'application/pdf';
+    const block = isPdf
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: currentB64 } }
+      : { type: 'image', source: { type: 'base64', media_type: currentMime, data: currentB64 } };
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: [
+          block,
+          { type: 'text', text: 'Extraé los datos de esta factura argentina. Respondé SOLO con JSON sin texto extra ni backticks:\n{"fecha_factura":"YYYY-MM-DD o vacío","proveedor":"nombre del emisor","tipo":"Factura A, Factura B, Factura C, Factura M, Nota de crédito, Nota de débito, Recibo, u Otro","nro_comprobante":"número completo","monto_total":número o 0}\nSi no podés leer un campo, dejá vacío o 0.' }
+        ]}]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = (data.content||[]).map(b=>b.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    const p = JSON.parse(raw);
+    if (p.fecha_factura) document.getElementById('f-fecha').value = p.fecha_factura;
+    if (p.proveedor) document.getElementById('f-proveedor').value = p.proveedor;
+    if (p.tipo) {
+      const s = document.getElementById('f-tipo');
+      for (let o of s.options) if (o.value === p.tipo) { s.value = p.tipo; break; }
+    }
+    if (p.nro_comprobante) document.getElementById('f-comprobante').value = p.nro_comprobante;
+    if (p.monto_total) document.getElementById('f-monto').value = p.monto_total;
+    setStatus('success', '✓ Datos leídos correctamente. Revisá y ajustá si hace falta.');
+  } catch(e) {
+    setStatus('error', 'No se pudo leer automáticamente: ' + (e.message||'error') + '. Completá el formulario a mano.');
+  }
+  document.getElementById('btnGuardar').disabled = false;
+}
+
+function guardarFactura() {
+  const proveedor = document.getElementById('f-proveedor').value.trim();
+  const tipo = document.getElementById('f-tipo').value;
+  if (!proveedor) { setStatus('error','Completá el campo Proveedor.'); return; }
+  if (!tipo) { setStatus('error','Seleccioná el tipo de comprobante.'); return; }
+  const entry = {
+    id: Date.now(),
+    fecha_factura: document.getElementById('f-fecha').value,
+    proveedor,
+    tipo,
+    comprobante: document.getElementById('f-comprobante').value.trim(),
+    monto: parseFloat(document.getElementById('f-monto').value) || 0,
+    fecha_carga: document.getElementById('f-carga').value || todayISO(),
+    archivo: currentFName || ''
+  };
+  facturas.unshift(entry);
+  saveData();
+  updateTopBadge();
+  setStatus('success','✓ Factura guardada correctamente.');
+  setTimeout(() => { limpiarForm(); clearFile(); switchTab('historial'); }, 1100);
+}
+
+function eliminarFactura(id) {
+  if (!confirm('¿Eliminar esta factura del historial?')) return;
+  facturas = facturas.filter(f => f.id !== id);
+  saveData();
+  updateTopBadge();
+  renderTable();
+  updateMetrics();
+}
+
+function limpiarForm() {
+  ['f-fecha','f-proveedor','f-comprobante','f-monto'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-tipo').value = '';
+  document.getElementById('f-carga').value = todayISO();
+  setStatus('','');
+}
+
+function badgeHtml(tipo) {
+  if (!tipo) return '<span class="badge b-x">—</span>';
+  if (tipo.includes('A')) return `<span class="badge b-a">${tipo}</span>`;
+  if (tipo.includes('B')) return `<span class="badge b-b">${tipo}</span>`;
+  if (tipo.includes('C')||tipo.includes('M')) return `<span class="badge b-c">${tipo}</span>`;
+  return `<span class="badge b-x">${tipo}</span>`;
+}
+
+function fmtMoney(n) {
+  if (!n) return '—';
+  return '$' + Number(n).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function renderTable() {
+  const q = (document.getElementById('searchInput').value||'').toLowerCase();
+  const filtered = facturas.filter(f =>
+    (f.proveedor||'').toLowerCase().includes(q) ||
+    (f.tipo||'').toLowerCase().includes(q) ||
+    (f.comprobante||'').toLowerCase().includes(q)
+  );
+  document.getElementById('countBadge').textContent = filtered.length + ' registros';
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><span class="empty-icon">📄</span>${facturas.length ? 'Sin resultados para esa búsqueda.' : 'Todavía no hay facturas cargadas.'}</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(f => `
+    <tr>
+      <td>${f.fecha_factura || '—'}</td>
+      <td title="${f.proveedor||''}">${f.proveedor||'—'}</td>
+      <td>${badgeHtml(f.tipo)}</td>
+      <td title="${f.comprobante||''}">${f.comprobante||'—'}</td>
+      <td class="monto-cell">${fmtMoney(f.monto)}</td>
+      <td>${f.fecha_carga||'—'}</td>
+      <td style="text-align:center"><button class="del-btn" onclick="eliminarFactura(${f.id})" title="Eliminar">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function updateMetrics() {
+  const total = facturas.length;
+  const monto = facturas.reduce((s,f) => s + (parseFloat(f.monto)||0), 0);
+  const mes = new Date().toISOString().slice(0,7);
+  const esteMes = facturas.filter(f => (f.fecha_carga||'').startsWith(mes)).length;
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-monto').textContent = fmtMoney(monto);
+  document.getElementById('m-mes').textContent = esteMes;
+}
+
+function exportarExcel() {
+  if (!facturas.length) { alert('No hay facturas para exportar.'); return; }
+  const rows = facturas.map(f => ({
+    'Fecha Factura': f.fecha_factura || '',
+    'Proveedor': f.proveedor || '',
+    'Tipo': f.tipo || '',
+    'Nro. Comprobante': f.comprobante || '',
+    'Monto ($)': f.monto || 0,
+    'Fecha Carga': f.fecha_carga || '',
+    'Archivo': f.archivo || ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:35},{wch:16},{wch:22},{wch:14},{wch:14},{wch:35}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Facturas Agri');
+  XLSX.writeFile(wb, 'historial_facturas_agri.xlsx');
+}
+</script>
+</body>
+</html>
